@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dialysis CDSS — Rounding Summary</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+    font-size: 13px;
+    background: #f5f5f0;
+    color: #1a1a1a;
+    padding: 16px;
+  }
+
+  h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px; }
+  h2 { font-size: 13px; font-weight: 700; text-transform: uppercase;
+       letter-spacing: 0.08em; border-bottom: 2px solid #1a1a1a;
+       padding-bottom: 4px; margin: 20px 0 10px; }
+
+  .toolbar {
+    display: flex; align-items: center; gap: 10px;
+    background: #1a1a1a; color: #f5f5f0;
+    padding: 10px 14px; border-radius: 4px; margin-bottom: 16px;
+  }
+  .toolbar label { font-size: 11px; opacity: 0.7; }
+
+  input[type="text"], input[type="date"], select, textarea {
+    font-family: inherit; font-size: 12px;
+    border: 1px solid #999; border-radius: 2px;
+    padding: 4px 6px; background: #fff;
+  }
+  textarea { resize: vertical; width: 100%; min-height: 48px; }
+
+  button {
+    font-family: inherit; font-size: 12px; font-weight: 700;
+    cursor: pointer; border: none; border-radius: 2px;
+    padding: 6px 14px; letter-spacing: 0.04em;
+  }
+  .btn-primary { background: #1a1a1a; color: #fff; }
+  .btn-primary:hover { background: #333; }
+  .btn-danger  { background: #c0392b; color: #fff; }
+  .btn-sm      { padding: 3px 8px; font-size: 11px; }
+  .btn-outline { background: transparent; border: 1px solid #999; color: #1a1a1a; }
+  .btn-outline:hover { background: #eee; }
+
+  /* Lab table */
+  .lab-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px; margin-bottom: 8px;
+  }
+  .lab-cell {
+    background: #fff; border: 1px solid #ddd; border-radius: 2px;
+    padding: 8px 10px;
+  }
+  .lab-cell label { display: block; font-size: 10px; color: #666;
+                    text-transform: uppercase; letter-spacing: 0.06em; }
+  .lab-cell input { width: 100%; border: none; outline: none;
+                    font-family: inherit; font-size: 13px; font-weight: 600; }
+
+  .trend-up   { color: #c0392b; }
+  .trend-down { color: #27ae60; }
+  .trend-flat { color: #888; }
+
+  /* Recommendation cards */
+  .rec-card {
+    background: #fff; border-left: 4px solid #999;
+    border-radius: 0 2px 2px 0; margin-bottom: 10px;
+    padding: 10px 14px;
+  }
+  .rec-card.urgent { border-color: #c0392b; background: #fff5f5; }
+  .rec-card.soon   { border-color: #e67e22; background: #fff9f0; }
+  .rec-card.routine{ border-color: #2980b9; }
+  .rec-card.monitor{ border-color: #aaa; background: #fafafa; }
+
+  .rec-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  }
+  .badge {
+    display: inline-block; font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 2px 6px; border-radius: 2px;
+  }
+  .badge.urgent  { background: #c0392b; color: #fff; }
+  .badge.soon    { background: #e67e22; color: #fff; }
+  .badge.routine { background: #2980b9; color: #fff; }
+  .badge.monitor { background: #888;    color: #fff; }
+
+  .rec-title { font-weight: 700; }
+  .rec-body  { color: #333; line-height: 1.5; margin: 4px 0 8px; }
+  .rec-rationale { font-size: 11px; color: #777; font-style: italic; }
+
+  /* Override section */
+  .override-section {
+    background: #fef9e7; border: 1px solid #f0c040;
+    border-radius: 2px; padding: 10px; margin-top: 8px;
+  }
+  .override-section label { font-size: 11px; font-weight: 700;
+                             display: block; margin-bottom: 4px; }
+  .override-row { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+  .override-row select { flex: 1 1 220px; }
+  .override-row input  { flex: 1 1 180px; }
+
+  /* Decision row: approve / override */
+  .decision-row {
+    display: flex; gap: 8px; align-items: center; margin-top: 8px;
+  }
+  .decision-row span { font-size: 11px; color: #555; }
+  .approved-mark { color: #27ae60; font-weight: 700; font-size: 12px; }
+
+  /* Summary sidebar */
+  .layout { display: flex; gap: 16px; }
+  .main   { flex: 1 1 0; min-width: 0; }
+  .sidebar{ width: 220px; flex-shrink: 0; }
+
+  .summary-box {
+    background: #fff; border: 1px solid #ddd;
+    border-radius: 2px; padding: 12px; margin-bottom: 12px;
+    font-size: 11px; line-height: 1.8;
+  }
+  .summary-box strong { display: block; font-size: 10px; text-transform: uppercase;
+                         letter-spacing: 0.08em; margin-bottom: 4px; }
+
+  /* Status bar */
+  #status {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #1a1a1a; color: #7fff7f;
+    padding: 5px 14px; font-size: 11px; z-index: 100;
+  }
+  #status.error { color: #ff7f7f; }
+
+  /* Input area */
+  .input-section { background: #fff; border: 1px solid #ddd;
+                   padding: 14px; border-radius: 2px; margin-bottom: 12px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; margin-bottom: -1px; }
+  .tab  { padding: 6px 14px; border: 1px solid #ddd; border-bottom: none;
+          cursor: pointer; background: #eee; font-size: 11px; font-weight: 700; }
+  .tab.active { background: #fff; }
+  .tab-content { border: 1px solid #ddd; padding: 14px; background: #fff;
+                 border-radius: 0 2px 2px 2px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  @media print {
+    #status, .toolbar, .input-section, .tabs { display: none !important; }
+    body { background: #fff; padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>Dialysis CDSS</h1>
+  <div style="flex:1"></div>
+  <label>Patient ID</label>
+  <input type="text" id="patientId" placeholder="MRN / ID" style="width:120px">
+  <label>Name</label>
+  <input type="text" id="patientName" placeholder="Patient name" style="width:160px">
+  <label>Date</label>
+  <input type="date" id="sessionDate">
+  <button class="btn-primary" onclick="loadPriorSession()">Load Prior</button>
+  <button class="btn-primary" onclick="window.print()">Print</button>
+</div>
+
+<div class="layout">
+<div class="main">
+
+<!-- ── Lab Entry ─────────────────────────────────────────────────────────── -->
+<div class="input-section">
+  <h2>Current Labs</h2>
+  <div class="lab-grid" id="labGrid">
+    <!-- Anemia -->
+    <div class="lab-cell">
+      <label>Hemoglobin (g/dL)</label>
+      <input type="number" step="0.1" id="lab_hemoglobin" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Ferritin (ng/mL)</label>
+      <input type="number" step="1" id="lab_ferritin" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>TSAT (%)</label>
+      <input type="number" step="1" id="lab_tsat" placeholder="—">
+    </div>
+    <!-- BMM -->
+    <div class="lab-cell">
+      <label>PTH (pg/mL)</label>
+      <input type="number" step="1" id="lab_pth" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Calcium (mg/dL)</label>
+      <input type="number" step="0.1" id="lab_calcium" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Phosphorus (mg/dL)</label>
+      <input type="number" step="0.1" id="lab_phosphorus" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Vitamin D 25-OH (ng/mL)</label>
+      <input type="number" step="1" id="lab_vitamin_d_25oh" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Albumin (g/dL)</label>
+      <input type="number" step="0.1" id="lab_albumin" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Bicarbonate (mEq/L)</label>
+      <input type="number" step="1" id="lab_bicarbonate" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Potassium (mEq/L)</label>
+      <input type="number" step="0.1" id="lab_potassium" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>BUN (mg/dL)</label>
+      <input type="number" step="1" id="lab_bun" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Creatinine (mg/dL)</label>
+      <input type="number" step="0.1" id="lab_creatinine" placeholder="—">
+    </div>
+  </div>
+
+  <h2 style="margin-top:14px">Current Medications</h2>
+  <div class="lab-grid">
+    <div class="lab-cell">
+      <label>EPO (units/week)</label>
+      <input type="number" step="500" id="med_epo_dose_units_per_week" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Darbepoetin (mcg/wk)</label>
+      <input type="number" step="0.1" id="med_darbepoetin_mcg_per_week" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Paricalcitol (mcg/tx)</label>
+      <input type="number" step="1" id="med_paricalcitol_mcg" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Calcitriol (mcg/tx)</label>
+      <input type="number" step="0.25" id="med_calcitriol_mcg" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Cinacalcet (mg/day)</label>
+      <input type="number" step="30" id="med_cinacalcet_mg" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Sevelamer (mg TID)</label>
+      <input type="number" step="400" id="med_sevelamer_mg_tid" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>Ca-Acetate (mg TID)</label>
+      <input type="number" step="667" id="med_calcium_acetate_mg_tid" placeholder="—">
+    </div>
+    <div class="lab-cell">
+      <label>IV Iron active?</label>
+      <select id="med_iron_iv_active">
+        <option value="">—</option>
+        <option value="true">Yes</option>
+        <option value="false">No</option>
+      </select>
+    </div>
+  </div>
+
+  <div style="margin-top:12px; display:flex; gap:8px">
+    <button class="btn-primary" onclick="evaluate()">Run Protocols</button>
+    <button class="btn-outline" onclick="clearForm()">Clear</button>
+    <button class="btn-outline" onclick="loadSampleCase(0)">Load Sample A</button>
+    <button class="btn-outline" onclick="loadSampleCase(4)">Load Sample E (critical)</button>
+  </div>
+</div>
+
+<!-- ── Recommendations ────────────────────────────────────────────────────── -->
+<div id="recsSection" style="display:none">
+  <h2>Recommendations</h2>
+  <div id="recsList"></div>
+
+  <div style="margin-top:12px; display:flex; gap:8px">
+    <button class="btn-primary" onclick="submitDecisions()">Submit All Decisions</button>
+    <button class="btn-outline" onclick="approveAll()">Approve All</button>
+  </div>
+  <div id="submitResult" style="margin-top:8px; font-size:12px; color:#27ae60"></div>
+</div>
+
+<!-- ── Deviation Log ──────────────────────────────────────────────────────── -->
+<div style="margin-top:20px">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('tabLog')">Deviation Log</div>
+    <div class="tab" onclick="switchTab('tabProtocols')">Loaded Protocols</div>
+  </div>
+  <div class="tab-content">
+    <div id="tabLog" class="tab-panel active">
+      <button class="btn-outline btn-sm" onclick="loadDeviations()" style="margin-bottom:8px">Refresh</button>
+      <div id="devLog" style="font-size:11px; max-height:300px; overflow-y:auto"></div>
+    </div>
+    <div id="tabProtocols" class="tab-panel">
+      <button class="btn-outline btn-sm" onclick="loadProtocolInfo()" style="margin-bottom:8px">Refresh</button>
+      <div id="protocolInfo" style="font-size:11px"></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ── Sidebar ────────────────────────────────────────────────────────────── -->
+<div class="sidebar">
+  <h2>Summary</h2>
+  <div class="summary-box" id="summaryBox">
+    <em style="color:#aaa">Run protocols to see summary</em>
+  </div>
+
+  <h2>Prior Labs</h2>
+  <div class="summary-box" id="priorLabsBox">
+    <em style="color:#aaa">Load prior session to compare</em>
+  </div>
+</div>
+</div><!-- /layout -->
+
+<div id="status">Ready</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let lastEvalResult = null;
+let decisions = {};   // rule_id -> { action: 'approve'|'override', ordered, reason, note }
+let overrideReasons = [];
+
+const SAMPLE_CASES = [
+  { patient_id:"TEST-001", patient_name:"Test Patient A", session_date:"2026-06-01",
+    labs:{ hemoglobin:11.2, ferritin:450, tsat:25, pth:720, calcium:9.4, phosphorus:4.8, vitamin_d_25oh:28, albumin:3.9 },
+    current_medications:{ paricalcitol_mcg:2, sevelamer_mg_tid:800 } },
+  { patient_id:"TEST-002", patient_name:"Test Patient B", session_date:"2026-06-01",
+    labs:{ hemoglobin:9.4, ferritin:120, tsat:16, pth:95, calcium:9.0, phosphorus:5.2, vitamin_d_25oh:14 },
+    current_medications:{ epo_dose_units_per_week:6000, paricalcitol_mcg:4, cinacalcet_mg:30, sevelamer_mg_tid:800 } },
+  { patient_id:"TEST-003", patient_name:"Test Patient C", session_date:"2026-06-01",
+    labs:{ hemoglobin:11.0, ferritin:380, tsat:24, pth:320, calcium:9.1, phosphorus:4.2, vitamin_d_25oh:32, albumin:4.0 },
+    current_medications:{ epo_dose_units_per_week:4000, paricalcitol_mcg:2, sevelamer_mg_tid:800 } },
+  { patient_id:"TEST-004", patient_name:"Test Patient D", session_date:"2026-06-01",
+    labs:{ hemoglobin:13.5, ferritin:850, tsat:34, pth:700, calcium:10.6, phosphorus:6.2, vitamin_d_25oh:30, albumin:3.7 },
+    current_medications:{ epo_dose_units_per_week:8000, iron_iv_active:true, paricalcitol_mcg:4, calcium_acetate_mg_tid:667, sevelamer_mg_tid:800 } },
+  { patient_id:"TEST-005", patient_name:"Test Patient E", session_date:"2026-06-01",
+    labs:{ hemoglobin:7.4, ferritin:650, tsat:28, pth:920, calcium:9.8, phosphorus:7.4, vitamin_d_25oh:10, albumin:3.2 },
+    current_medications:{ epo_dose_units_per_week:12000, sevelamer_mg_tid:1600 } },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setStatus(msg, err=false) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = err ? 'error' : '';
+}
+
+async function api(method, path, body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(`${r.status}: ${t}`);
+  }
+  return r.json();
+}
+
+function num(id) {
+  const v = document.getElementById(id)?.value;
+  return v !== '' && v !== null && v !== undefined ? parseFloat(v) : null;
+}
+function bool(id) {
+  const v = document.getElementById(id)?.value;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return null;
+}
+
+function setField(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.tagName === 'SELECT') {
+    el.value = val === null || val === undefined ? '' : String(val);
+  } else {
+    el.value = val === null || val === undefined ? '' : val;
+  }
+}
+
+function collectPayload() {
+  const labs = {};
+  const labFields = ['hemoglobin','ferritin','tsat','pth','calcium','phosphorus',
+                     'vitamin_d_25oh','albumin','bicarbonate','potassium','bun','creatinine'];
+  labFields.forEach(f => { const v = num('lab_'+f); if (v !== null) labs[f] = v; });
+
+  const meds = {};
+  const medNumFields = ['epo_dose_units_per_week','darbepoetin_mcg_per_week','paricalcitol_mcg',
+                        'calcitriol_mcg','cinacalcet_mg','sevelamer_mg_tid','calcium_acetate_mg_tid'];
+  medNumFields.forEach(f => { const v = num('med_'+f); if (v !== null) meds[f] = v; });
+  const iv = bool('med_iron_iv_active');
+  if (iv !== null) meds['iron_iv_active'] = iv;
+
+  return {
+    patient_id:   document.getElementById('patientId').value.trim() || 'UNKNOWN',
+    patient_name: document.getElementById('patientName').value.trim(),
+    session_date: document.getElementById('sessionDate').value || new Date().toISOString().slice(0,10),
+    labs,
+    current_medications: meds,
+  };
+}
+
+function loadSampleCase(idx) {
+  const c = SAMPLE_CASES[idx];
+  document.getElementById('patientId').value   = c.patient_id;
+  document.getElementById('patientName').value = c.patient_name;
+  document.getElementById('sessionDate').value = c.session_date;
+  Object.entries(c.labs).forEach(([k,v]) => setField('lab_'+k, v));
+  Object.entries(c.current_medications).forEach(([k,v]) => setField('med_'+k, v));
+  setStatus(`Loaded ${c.patient_name}`);
+}
+
+function clearForm() {
+  document.getElementById('patientId').value   = '';
+  document.getElementById('patientName').value = '';
+  document.getElementById('sessionDate').value = '';
+  document.querySelectorAll('.lab-cell input, .lab-cell select').forEach(el => el.value = '');
+  document.querySelectorAll('.lab-grid input, .lab-grid select').forEach(el => el.value = '');
+  document.getElementById('recsSection').style.display = 'none';
+  setStatus('Form cleared');
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const idx = ['tabLog','tabProtocols'].indexOf(id);
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+}
+
+// ── Evaluate ──────────────────────────────────────────────────────────────────
+async function evaluate() {
+  setStatus('Running protocols…');
+  try {
+    if (!overrideReasons.length) {
+      overrideReasons = await api('GET', '/api/override-reasons');
+    }
+    const payload = collectPayload();
+    const result  = await api('POST', '/api/evaluate', payload);
+    lastEvalResult = result;
+    decisions = {};
+    renderRecs(result);
+    renderSummary(result);
+    setStatus(`${result.recommendations.length} recommendation(s) generated`);
+  } catch(e) {
+    setStatus('Error: ' + e.message, true);
+  }
+}
+
+function urgencyIcon(u) {
+  return { urgent:'🚨 ', soon:'⚠️ ', routine:'ℹ️ ', monitor:'✓ ' }[u] || '';
+}
+
+function renderRecs(result) {
+  const recs = result.recommendations;
+  const section = document.getElementById('recsSection');
+  const list    = document.getElementById('recsList');
+  section.style.display = 'block';
+  list.innerHTML = '';
+
+  if (!recs.length) {
+    list.innerHTML = '<p style="color:#555">No protocol deviations detected. All values appear within target ranges.</p>';
+    return;
+  }
+
+  recs.forEach(rec => {
+    const actions = rec.actions.map(a => a.instruction || a.type).join('<br>');
+    const reasonOpts = overrideReasons.map(r =>
+      `<option value="${r}">${r}</option>`).join('');
+
+    const card = document.createElement('div');
+    card.className = `rec-card ${rec.urgency}`;
+    card.id = `rec-${rec.rule_id}`;
+    card.innerHTML = `
+      <div class="rec-header">
+        <span class="badge ${rec.urgency}">${urgencyIcon(rec.urgency)}${rec.urgency}</span>
+        <span style="font-size:10px;color:#888">${rec.rule_id} · ${rec.protocol}</span>
+        <span class="rec-title">${rec.rule_name}</span>
+      </div>
+      <div class="rec-body">${actions}</div>
+      ${rec.rationale ? `<div class="rec-rationale">${rec.rationale}</div>` : ''}
+
+      <div class="decision-row">
+        <button class="btn-primary btn-sm" onclick="setDecision('${rec.rule_id}','approve',this)">Approve</button>
+        <button class="btn-outline btn-sm" onclick="toggleOverride('${rec.rule_id}',this)">Override</button>
+        <span id="dec-status-${rec.rule_id}" style="font-size:11px;color:#888">— not decided —</span>
+      </div>
+
+      <div id="override-${rec.rule_id}" class="override-section" style="display:none;margin-top:10px">
+        <label>What was actually ordered?</label>
+        <input type="text" id="ordered-${rec.rule_id}" placeholder="Free text — what you ordered instead" style="width:100%;margin-bottom:6px">
+        <label>Reason for deviation</label>
+        <select id="reason-${rec.rule_id}">
+          <option value="">— select reason —</option>
+          ${reasonOpts}
+        </select>
+        <label style="margin-top:6px">Clinician note (optional)</label>
+        <textarea id="note-${rec.rule_id}" placeholder="Additional context…"></textarea>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function setDecision(ruleId, action, btn) {
+  decisions[ruleId] = { action };
+  const status = document.getElementById(`dec-status-${ruleId}`);
+  status.innerHTML = `<span class="approved-mark">✓ Approved</span>`;
+  document.getElementById(`override-${ruleId}`).style.display = 'none';
+}
+
+function toggleOverride(ruleId, btn) {
+  const panel = document.getElementById(`override-${ruleId}`);
+  const hidden = panel.style.display === 'none';
+  panel.style.display = hidden ? 'block' : 'none';
+  if (hidden) {
+    decisions[ruleId] = { action: 'override' };
+    document.getElementById(`dec-status-${ruleId}`).innerHTML =
+      '<span style="color:#e67e22;font-weight:700">⚡ Override (fill in below)</span>';
+  }
+}
+
+function approveAll() {
+  lastEvalResult.recommendations.forEach(rec => {
+    decisions[rec.rule_id] = { action: 'approve' };
+    const el = document.getElementById(`dec-status-${rec.rule_id}`);
+    if (el) el.innerHTML = '<span class="approved-mark">✓ Approved</span>';
+    const panel = document.getElementById(`override-${rec.rule_id}`);
+    if (panel) panel.style.display = 'none';
+  });
+}
+
+async function submitDecisions() {
+  if (!lastEvalResult) return;
+  const { patient_id, session_date, recommendations } = lastEvalResult;
+  const errors = [];
+  const logs = [];
+
+  for (const rec of recommendations) {
+    const dec = decisions[rec.rule_id];
+    if (!dec) { errors.push(`${rec.rule_id}: no decision made`); continue; }
+    if (dec.action === 'override') {
+      const ordered = document.getElementById(`ordered-${rec.rule_id}`)?.value?.trim();
+      const reason  = document.getElementById(`reason-${rec.rule_id}`)?.value;
+      const note    = document.getElementById(`note-${rec.rule_id}`)?.value?.trim();
+      if (!ordered) { errors.push(`${rec.rule_id}: missing "ordered" field`); continue; }
+      if (!reason)  { errors.push(`${rec.rule_id}: missing override reason`); continue; }
+      logs.push(api('POST', '/api/deviations', {
+        patient_id, session_date,
+        rule_id: rec.rule_id, protocol: rec.protocol, rule_name: rec.rule_name,
+        recommended: rec.actions, ordered, override_reason: reason, clinician_note: note || '',
+      }));
+    }
+  }
+
+  if (errors.length) {
+    document.getElementById('submitResult').textContent = 'Fix: ' + errors.join(' | ');
+    document.getElementById('submitResult').style.color = '#c0392b';
+    return;
+  }
+
+  setStatus('Submitting…');
+  try {
+    await Promise.all(logs);
+    const overrideCount = Object.values(decisions).filter(d => d.action==='override').length;
+    const approveCount  = Object.values(decisions).filter(d => d.action==='approve').length;
+    document.getElementById('submitResult').textContent =
+      `✓ Submitted — ${approveCount} approved, ${overrideCount} overridden`;
+    document.getElementById('submitResult').style.color = '#27ae60';
+    setStatus('Session recorded');
+    loadDeviations();
+  } catch(e) {
+    setStatus('Submit error: ' + e.message, true);
+  }
+}
+
+// ── Summary sidebar ──────────────────────────────────────────────────────────
+function renderSummary(result) {
+  const recs = result.recommendations;
+  const urgent  = recs.filter(r => r.urgency === 'urgent').length;
+  const soon    = recs.filter(r => r.urgency === 'soon').length;
+  const routine = recs.filter(r => r.urgency === 'routine').length;
+  const monitor = recs.filter(r => r.urgency === 'monitor').length;
+
+  document.getElementById('summaryBox').innerHTML = `
+    <strong>${result.patient_name || result.patient_id} — ${result.session_date}</strong>
+    <span style="color:#c0392b">Urgent: ${urgent}</span>
+    <span style="color:#e67e22">Soon: ${soon}</span>
+    <span style="color:#2980b9">Routine: ${routine}</span>
+    <span style="color:#888">Monitor: ${monitor}</span>
+    <hr style="margin:6px 0">
+    <span>Hgb: ${result.labs.hemoglobin ?? '—'} g/dL</span>
+    <span>PTH: ${result.labs.pth ?? '—'} pg/mL</span>
+    <span>Ca: ${result.labs.calcium ?? '—'} mg/dL</span>
+    <span>Phos: ${result.labs.phosphorus ?? '—'} mg/dL</span>
+    <span>TSAT: ${result.labs.tsat ?? '—'}%</span>
+    <span>Ferritin: ${result.labs.ferritin ?? '—'}</span>
+  `;
+}
+
+// ── Load prior session ────────────────────────────────────────────────────────
+async function loadPriorSession() {
+  const pid = document.getElementById('patientId').value.trim();
+  if (!pid) { setStatus('Enter a Patient ID first', true); return; }
+  try {
+    const sessions = await api('GET', `/api/sessions/${encodeURIComponent(pid)}?limit=2`);
+    if (sessions.length < 2) {
+      document.getElementById('priorLabsBox').innerHTML = '<em style="color:#aaa">No prior session found</em>';
+      return;
+    }
+    const prior = sessions[1].lab_snapshot.labs;
+    const current = lastEvalResult?.labs || {};
+    const fields = ['hemoglobin','ferritin','tsat','pth','calcium','phosphorus'];
+
+    const rows = fields.map(f => {
+      const curr = current[f] ?? '—';
+      const prev = prior[f] ?? '—';
+      let arrow = '';
+      if (curr !== '—' && prev !== '—') {
+        if (curr > prev) arrow = '<span class="trend-up">↑</span>';
+        else if (curr < prev) arrow = '<span class="trend-down">↓</span>';
+        else arrow = '<span class="trend-flat">→</span>';
+      }
+      return `<span>${f}: ${prev} → ${curr} ${arrow}</span>`;
+    }).join('');
+
+    document.getElementById('priorLabsBox').innerHTML =
+      `<strong>Prior: ${sessions[1].session_date}</strong>${rows}`;
+    setStatus('Prior session loaded');
+  } catch(e) {
+    setStatus('Could not load prior: ' + e.message, true);
+  }
+}
+
+// ── Deviation log ─────────────────────────────────────────────────────────────
+async function loadDeviations() {
+  try {
+    const pid = document.getElementById('patientId').value.trim();
+    const devs = await api('GET', '/api/deviations' + (pid ? `?patient_id=${encodeURIComponent(pid)}&limit=50` : '?limit=50'));
+    const el = document.getElementById('devLog');
+    if (!devs.length) { el.textContent = 'No deviations logged yet.'; return; }
+    el.innerHTML = devs.map(d => `
+      <div style="border-bottom:1px solid #eee;padding:6px 0">
+        <span style="color:#888">${d.created_at.slice(0,10)}</span>
+        <strong>${d.patient_id}</strong> — ${d.rule_id} (${d.protocol})<br>
+        <span style="color:#c0392b">Override:</span> ${d.override_reason}<br>
+        <span>Ordered: ${d.ordered}</span>
+        ${d.clinician_note ? `<br><em>${d.clinician_note}</em>` : ''}
+      </div>
+    `).join('');
+  } catch(e) {
+    document.getElementById('devLog').textContent = 'Error: ' + e.message;
+  }
+}
+
+async function loadProtocolInfo() {
+  try {
+    const info = await api('GET', '/api/protocols');
+    document.getElementById('protocolInfo').innerHTML = Object.entries(info).map(([name, meta]) =>
+      `<div style="padding:4px 0"><strong>${name}</strong> — ${meta.rule_count} rules (v${meta.version})</div>`
+    ).join('');
+  } catch(e) {
+    document.getElementById('protocolInfo').textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.getElementById('sessionDate').value = new Date().toISOString().slice(0, 10);
+loadDeviations();
+loadProtocolInfo();
+</script>
+</body>
+</html>

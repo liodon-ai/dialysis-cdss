@@ -1,0 +1,160 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Anemia Management Protocol (ESA + Iron)
+# ─────────────────────────────────────────────────────────────────────────────
+
+protocol: anemia
+version: "1.0"
+
+rules:
+
+  # ── Hemoglobin ─────────────────────────────────────────────────────────────
+
+  - id: AN-001
+    name: "Hgb critically low — urgent ESA escalation"
+    enabled: true
+    urgency: urgent
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: "<"
+        value: 8.0
+    actions:
+      - type: escalate
+        instruction: "Hgb critically low (<8.0 g/dL). Increase EPO by 25% or darbepoetin by next dose tier. Evaluate for transfusion if symptomatic. Check for bleeding source."
+    rationale: "Hgb <8.0 is below the safety threshold; risk of cardiovascular decompensation."
+
+  - id: AN-002
+    name: "Hgb below target — increase ESA"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: between
+        value: [8.0, 10.0]
+    actions:
+      - type: increase_dose
+        medication: epo_or_darbepoetin
+        instruction: "Hgb below target (<10 g/dL). Increase EPO dose by ~25% or advance darbepoetin by one dose tier. Recheck Hgb in 4 weeks."
+    rationale: "KDIGO Hgb target for dialysis is generally 10–12 g/dL."
+
+  - id: AN-003
+    name: "Hgb in target range — no ESA change"
+    enabled: true
+    urgency: monitor
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: between
+        value: [10.0, 12.0]
+    actions:
+      - type: no_change
+        instruction: "Hgb in target range (10–12 g/dL). Continue current ESA dose."
+    rationale: "Maintain Hgb 10–12 g/dL per KDIGO 2012."
+
+  - id: AN-004
+    name: "Hgb above target — reduce ESA"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: between
+        value: [12.0, 13.0]
+    actions:
+      - type: decrease_dose
+        medication: epo_or_darbepoetin
+        instruction: "Hgb above target (>12 g/dL). Reduce ESA dose by 25% or hold one dose. Recheck in 4 weeks."
+    rationale: "Hgb >12 g/dL is associated with increased stroke and thrombosis risk in KDIGO/TREAT data."
+
+  - id: AN-005
+    name: "Hgb critically high — hold ESA"
+    enabled: true
+    urgency: soon
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: ">"
+        value: 13.0
+    actions:
+      - type: hold
+        medication: epo_or_darbepoetin
+        instruction: "Hold ESA until Hgb falls below 12 g/dL. Resume at 75% of prior dose."
+    rationale: "Hgb >13 carries highest thrombotic risk; TREAT trial data."
+
+  # ── Iron stores ────────────────────────────────────────────────────────────
+
+  - id: AN-006
+    name: "Iron deficient — initiate IV iron"
+    enabled: true
+    urgency: routine
+    logic: OR
+    conditions:
+      - field: tsat
+        operator: "<"
+        value: 20
+      - field: ferritin
+        operator: "<"
+        value: 200
+    actions:
+      - type: initiate
+        medication: iv_iron
+        instruction: "TSAT <20% or ferritin <200: initiate IV iron (e.g., ferric gluconate 125 mg per treatment × 8 doses, or iron sucrose per protocol)."
+    rationale: "Functional iron deficiency impairs ESA response; repletion reduces ESA requirements."
+
+  - id: AN-007
+    name: "Iron replete — hold IV iron"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: tsat
+        operator: ">="
+        value: 30
+      - field: ferritin
+        operator: ">="
+        value: 800
+    actions:
+      - type: hold
+        medication: iv_iron
+        instruction: "TSAT ≥30% and ferritin ≥800: hold IV iron. Recheck in 3 months."
+    rationale: "Iron overload increases oxidative stress and infection risk."
+
+  - id: AN-008
+    name: "Iron adequate — maintenance IV iron"
+    enabled: true
+    urgency: monitor
+    logic: AND
+    conditions:
+      - field: tsat
+        operator: between
+        value: [20, 30]
+      - field: ferritin
+        operator: between
+        value: [200, 800]
+    actions:
+      - type: no_change
+        instruction: "Iron stores adequate (TSAT 20–30%, ferritin 200–800). Continue maintenance iron per protocol."
+    rationale: "Target iron indices per KDIGO 2012 anemia guidelines."
+
+  # ── ESA hypo-response flag ─────────────────────────────────────────────────
+
+  - id: AN-009
+    name: "Possible ESA hypo-response — investigate"
+    enabled: true
+    urgency: soon
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: "<"
+        value: 10.0
+      - field: tsat
+        operator: ">="
+        value: 20
+      - field: ferritin
+        operator: ">="
+        value: 200
+    actions:
+      - type: investigate
+        instruction: "Hgb below target despite adequate iron stores — evaluate for ESA hypo-response. Check: infection, inflammation (CRP), blood loss, hyperparathyroidism (PTH), aluminum toxicity, B12/folate, hemolysis."
+    rationale: "Adequate iron with persistent anemia suggests a non-iron cause; escalating ESA alone is insufficient."

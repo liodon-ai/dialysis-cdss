@@ -1,0 +1,28 @@
+{
+  "_note": "Gold-standard expected rule IDs per test case. Replace with YOUR manually prepared outputs once you supply your protocols. Current values are verified against the example protocols shipped with this repo.",
+  "TEST-001": {
+    "expected_rule_ids": ["AN-003", "AN-008", "BMM-002", "PHOS-003"],
+    "expected_urgencies": ["monitor", "monitor", "routine", "monitor"],
+    "notes": "PTH 720 + Ca 9.4 → BMM-002 (increase Vit D). Hgb 11.2, iron, phos all in target → monitor rules only."
+  },
+  "TEST-002": {
+    "expected_rule_ids": ["AN-002", "AN-006", "BMM-004", "BMM-008", "PHOS-003"],
+    "expected_urgencies": ["routine", "routine", "routine", "routine", "monitor"],
+    "notes": "Hgb 9.4 → AN-002; TSAT 16 + ferritin 120 → AN-006; PTH 95 + Ca 9.0 → BMM-004 (over-suppressed); VitD 14 → BMM-008; Phos 5.2 in range → PHOS-003."
+  },
+  "TEST-003": {
+    "expected_rule_ids": ["AN-003", "AN-008", "BMM-007", "PHOS-003"],
+    "expected_urgencies": ["monitor", "monitor", "monitor", "monitor"],
+    "notes": "All values in target — only monitor-level rules expected."
+  },
+  "TEST-004": {
+    "expected_rule_ids": ["AN-005", "AN-007", "BMM-003", "BMM-006", "PHOS-002", "PHOS-005"],
+    "expected_urgencies": ["soon", "routine", "soon", "soon", "routine", "soon"],
+    "notes": "Hgb 13.5 → AN-005 hold ESA; iron overloaded → AN-007; PTH 700 + Ca 10.6 → BMM-003 calcimimetic; Ca high → BMM-006 hold VitD; Phos 6.2 between 5.5-7.0 → PHOS-002; phos+Ca both high → PHOS-005 switch to non-Ca binder."
+  },
+  "TEST-005": {
+    "expected_rule_ids": ["AN-001", "AN-008", "AN-009", "BMM-001", "BMM-002", "BMM-008", "PHOS-001"],
+    "expected_urgencies": ["urgent", "monitor", "soon", "urgent", "routine", "routine", "urgent"],
+    "notes": "Hgb 7.4 critically low → AN-001; iron adequate → AN-008 (maintenance); adequate iron + low Hgb → AN-009 ESA hypo-response; PTH 920 → BMM-001 critical + BMM-002; VitD 10 → BMM-008; Phos 7.4 → PHOS-001 critically elevated."
+  }
+}

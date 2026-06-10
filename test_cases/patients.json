@@ -1,0 +1,107 @@
+[
+  {
+    "_comment": "Case 1: Classic uncontrolled secondary hyperparathyroidism with safe calcium",
+    "patient_id": "TEST-001",
+    "patient_name": "Test Patient A",
+    "session_date": "2026-06-01",
+    "labs": {
+      "hemoglobin": 11.2,
+      "ferritin": 450,
+      "tsat": 25,
+      "pth": 720,
+      "calcium": 9.4,
+      "phosphorus": 4.8,
+      "vitamin_d_25oh": 28,
+      "albumin": 3.9
+    },
+    "current_medications": {
+      "paricalcitol_mcg": 2,
+      "sevelamer_mg_tid": 800
+    }
+  },
+  {
+    "_comment": "Case 2: Over-suppressed PTH, low Hgb, iron deficient",
+    "patient_id": "TEST-002",
+    "patient_name": "Test Patient B",
+    "session_date": "2026-06-01",
+    "labs": {
+      "hemoglobin": 9.4,
+      "ferritin": 120,
+      "tsat": 16,
+      "pth": 95,
+      "calcium": 9.0,
+      "phosphorus": 5.2,
+      "vitamin_d_25oh": 14
+    },
+    "current_medications": {
+      "epo_dose_units_per_week": 6000,
+      "paricalcitol_mcg": 4,
+      "cinacalcet_mg": 30,
+      "sevelamer_mg_tid": 800
+    }
+  },
+  {
+    "_comment": "Case 3: Well-controlled — all targets met, expect monitor-only recommendations",
+    "patient_id": "TEST-003",
+    "patient_name": "Test Patient C",
+    "session_date": "2026-06-01",
+    "labs": {
+      "hemoglobin": 11.0,
+      "ferritin": 380,
+      "tsat": 24,
+      "pth": 320,
+      "calcium": 9.1,
+      "phosphorus": 4.2,
+      "vitamin_d_25oh": 32,
+      "albumin": 4.0
+    },
+    "current_medications": {
+      "epo_dose_units_per_week": 4000,
+      "paricalcitol_mcg": 2,
+      "sevelamer_mg_tid": 800
+    }
+  },
+  {
+    "_comment": "Case 4: High Hgb (over-target), hypercalcemia, high phosphorus — classic over-treatment",
+    "patient_id": "TEST-004",
+    "patient_name": "Test Patient D",
+    "session_date": "2026-06-01",
+    "labs": {
+      "hemoglobin": 13.5,
+      "ferritin": 850,
+      "tsat": 34,
+      "pth": 700,
+      "calcium": 10.6,
+      "phosphorus": 6.2,
+      "vitamin_d_25oh": 30,
+      "albumin": 3.7
+    },
+    "current_medications": {
+      "epo_dose_units_per_week": 8000,
+      "iron_iv_active": true,
+      "paricalcitol_mcg": 4,
+      "calcium_acetate_mg_tid": 667,
+      "sevelamer_mg_tid": 800
+    }
+  },
+  {
+    "_comment": "Case 5: Critical anemia, ESA hypo-response (adequate iron), severely elevated PTH",
+    "patient_id": "TEST-005",
+    "patient_name": "Test Patient E",
+    "session_date": "2026-06-01",
+    "labs": {
+      "hemoglobin": 7.4,
+      "ferritin": 650,
+      "tsat": 28,
+      "pth": 920,
+      "calcium": 9.8,
+      "phosphorus": 7.4,
+      "vitamin_d_25oh": 10,
+      "albumin": 3.2
+    },
+    "current_medications": {
+      "epo_dose_units_per_week": 12000,
+      "sevelamer_mg_tid": 1600
+    }
+  }
+]
