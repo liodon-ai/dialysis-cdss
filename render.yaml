@@ -18,6 +18,8 @@ services:
     #   sizeGB: 1       # $0.25/GB/month on top of service cost
 
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
       - key: DATA_DIR
         value: /data    # matches mountPath above — harmless on free tier
                         # (will fall back to ephemeral /data inside the container)
