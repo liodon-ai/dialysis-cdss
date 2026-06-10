@@ -1,13 +1,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Anemia Management Protocol (ESA + Iron)
+#
+# Template tokens available in instruction strings:
+#   {hemoglobin}  {ferritin}  {tsat}
+#   {epo_dose_units_per_week}   {darbepoetin_mcg_per_week}
+#   {epo_dose_units_per_week * 1.25}  — computed 25% increase
+#   {epo_dose_units_per_week * 0.75}  — computed 25% reduction
 # ─────────────────────────────────────────────────────────────────────────────
 
 protocol: anemia
-version: "1.0"
+version: "1.1"
 
 rules:
 
-  # ── Hemoglobin ─────────────────────────────────────────────────────────────
+  # ── Hemoglobin — critically low ────────────────────────────────────────────
 
   - id: AN-001
     name: "Hgb critically low — urgent ESA escalation"
@@ -18,13 +24,43 @@ rules:
       - field: hemoglobin
         operator: "<"
         value: 8.0
+      - field: epo_dose_units_per_week
+        operator: is_not_null
     actions:
-      - type: escalate
-        instruction: "Hgb critically low (<8.0 g/dL). Increase EPO by 25% or darbepoetin by next dose tier. Evaluate for transfusion if symptomatic. Check for bleeding source."
-    rationale: "Hgb <8.0 is below the safety threshold; risk of cardiovascular decompensation."
+      - type: increase_dose
+        medication: epo
+        instruction: >
+          Hgb {hemoglobin} g/dL — critically low. Increase EPO from {epo_dose_units_per_week}
+          units/week → {epo_dose_units_per_week * 1.25} units/week (25% increase).
+          Evaluate for transfusion if symptomatic. Rule out bleeding.
+    rationale: "Hgb {hemoglobin} < 8.0 g/dL is below the safety threshold."
+
+  - id: AN-001b
+    name: "Hgb critically low — urgent, initiate ESA"
+    enabled: true
+    urgency: urgent
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: "<"
+        value: 8.0
+      - field: epo_dose_units_per_week
+        operator: is_null
+      - field: darbepoetin_mcg_per_week
+        operator: is_null
+    actions:
+      - type: initiate
+        medication: epo
+        instruction: >
+          Hgb {hemoglobin} g/dL — critically low, no ESA on file. Initiate EPO
+          (typical starting dose 50–100 units/kg 3×/week) or darbepoetin per protocol.
+          Evaluate for transfusion if symptomatic. Rule out bleeding.
+    rationale: "Hgb {hemoglobin} < 8.0 g/dL with no ESA prescribed."
+
+  # ── Hemoglobin — below target ──────────────────────────────────────────────
 
   - id: AN-002
-    name: "Hgb below target — increase ESA"
+    name: "Hgb below target — increase EPO dose"
     enabled: true
     urgency: routine
     logic: AND
@@ -32,11 +68,59 @@ rules:
       - field: hemoglobin
         operator: between
         value: [8.0, 10.0]
+      - field: epo_dose_units_per_week
+        operator: is_not_null
     actions:
       - type: increase_dose
-        medication: epo_or_darbepoetin
-        instruction: "Hgb below target (<10 g/dL). Increase EPO dose by ~25% or advance darbepoetin by one dose tier. Recheck Hgb in 4 weeks."
-    rationale: "KDIGO Hgb target for dialysis is generally 10–12 g/dL."
+        medication: epo
+        instruction: >
+          Hgb {hemoglobin} g/dL — below target. Increase EPO from
+          {epo_dose_units_per_week} units/week → {epo_dose_units_per_week * 1.25}
+          units/week (25% increase). Recheck Hgb in 4 weeks.
+    rationale: "KDIGO target Hgb 10–12 g/dL."
+
+  - id: AN-002b
+    name: "Hgb below target — increase darbepoetin dose"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: between
+        value: [8.0, 10.0]
+      - field: darbepoetin_mcg_per_week
+        operator: is_not_null
+    actions:
+      - type: increase_dose
+        medication: darbepoetin
+        instruction: >
+          Hgb {hemoglobin} g/dL — below target. Increase darbepoetin from
+          {darbepoetin_mcg_per_week} mcg/week — advance one dose tier per protocol.
+          Recheck Hgb in 4 weeks.
+    rationale: "KDIGO target Hgb 10–12 g/dL."
+
+  - id: AN-002c
+    name: "Hgb below target — initiate ESA"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: between
+        value: [8.0, 10.0]
+      - field: epo_dose_units_per_week
+        operator: is_null
+      - field: darbepoetin_mcg_per_week
+        operator: is_null
+    actions:
+      - type: initiate
+        medication: epo
+        instruction: >
+          Hgb {hemoglobin} g/dL — below target, no ESA on file.
+          Initiate EPO (typically 50 units/kg 3×/week) or darbepoetin per protocol.
+    rationale: "KDIGO target Hgb 10–12 g/dL; no ESA currently prescribed."
+
+  # ── Hemoglobin — in target ─────────────────────────────────────────────────
 
   - id: AN-003
     name: "Hgb in target range — no ESA change"
@@ -49,11 +133,13 @@ rules:
         value: [10.0, 12.0]
     actions:
       - type: no_change
-        instruction: "Hgb in target range (10–12 g/dL). Continue current ESA dose."
-    rationale: "Maintain Hgb 10–12 g/dL per KDIGO 2012."
+        instruction: "Hgb {hemoglobin} g/dL — in target range (10–12). Continue current ESA dose."
+    rationale: "KDIGO target Hgb 10–12 g/dL."
+
+  # ── Hemoglobin — above target ──────────────────────────────────────────────
 
   - id: AN-004
-    name: "Hgb above target — reduce ESA"
+    name: "Hgb above target — reduce EPO dose"
     enabled: true
     urgency: routine
     logic: AND
@@ -61,14 +147,38 @@ rules:
       - field: hemoglobin
         operator: between
         value: [12.0, 13.0]
+      - field: epo_dose_units_per_week
+        operator: is_not_null
     actions:
       - type: decrease_dose
-        medication: epo_or_darbepoetin
-        instruction: "Hgb above target (>12 g/dL). Reduce ESA dose by 25% or hold one dose. Recheck in 4 weeks."
-    rationale: "Hgb >12 g/dL is associated with increased stroke and thrombosis risk in KDIGO/TREAT data."
+        medication: epo
+        instruction: >
+          Hgb {hemoglobin} g/dL — above target. Reduce EPO from
+          {epo_dose_units_per_week} units/week → {epo_dose_units_per_week * 0.75}
+          units/week (25% reduction). Recheck Hgb in 4 weeks.
+    rationale: "Hgb >12 g/dL increases thrombosis risk (KDIGO/TREAT data)."
+
+  - id: AN-004b
+    name: "Hgb above target — reduce darbepoetin dose"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: between
+        value: [12.0, 13.0]
+      - field: darbepoetin_mcg_per_week
+        operator: is_not_null
+    actions:
+      - type: decrease_dose
+        medication: darbepoetin
+        instruction: >
+          Hgb {hemoglobin} g/dL — above target. Reduce darbepoetin from
+          {darbepoetin_mcg_per_week} mcg/week — step down one dose tier. Recheck in 4 weeks.
+    rationale: "Hgb >12 g/dL increases thrombosis risk."
 
   - id: AN-005
-    name: "Hgb critically high — hold ESA"
+    name: "Hgb critically high — hold ESA (EPO)"
     enabled: true
     urgency: soon
     logic: AND
@@ -76,16 +186,41 @@ rules:
       - field: hemoglobin
         operator: ">"
         value: 13.0
+      - field: epo_dose_units_per_week
+        operator: is_not_null
     actions:
       - type: hold
-        medication: epo_or_darbepoetin
-        instruction: "Hold ESA until Hgb falls below 12 g/dL. Resume at 75% of prior dose."
-    rationale: "Hgb >13 carries highest thrombotic risk; TREAT trial data."
+        medication: epo
+        instruction: >
+          Hgb {hemoglobin} g/dL — critically high. Hold EPO (currently
+          {epo_dose_units_per_week} units/week) until Hgb falls below 12 g/dL.
+          Resume at {epo_dose_units_per_week * 0.75} units/week (75% of current dose).
+    rationale: "Hgb >13 g/dL carries highest thrombotic risk."
+
+  - id: AN-005b
+    name: "Hgb critically high — hold ESA (darbepoetin)"
+    enabled: true
+    urgency: soon
+    logic: AND
+    conditions:
+      - field: hemoglobin
+        operator: ">"
+        value: 13.0
+      - field: darbepoetin_mcg_per_week
+        operator: is_not_null
+    actions:
+      - type: hold
+        medication: darbepoetin
+        instruction: >
+          Hgb {hemoglobin} g/dL — critically high. Hold darbepoetin (currently
+          {darbepoetin_mcg_per_week} mcg/week) until Hgb falls below 12 g/dL.
+          Resume at reduced dose.
+    rationale: "Hgb >13 g/dL carries highest thrombotic risk."
 
   # ── Iron stores ────────────────────────────────────────────────────────────
 
   - id: AN-006
-    name: "Iron deficient — initiate IV iron"
+    name: "Iron deficient — initiate/continue IV iron"
     enabled: true
     urgency: routine
     logic: OR
@@ -99,11 +234,14 @@ rules:
     actions:
       - type: initiate
         medication: iv_iron
-        instruction: "TSAT <20% or ferritin <200: initiate IV iron (e.g., ferric gluconate 125 mg per treatment × 8 doses, or iron sucrose per protocol)."
-    rationale: "Functional iron deficiency impairs ESA response; repletion reduces ESA requirements."
+        instruction: >
+          Iron deficient — TSAT {tsat}%, ferritin {ferritin} ng/mL.
+          Initiate IV iron (e.g., ferric gluconate 125 mg per treatment × 8 doses,
+          or iron sucrose per protocol).
+    rationale: "Functional iron deficiency impairs ESA response."
 
   - id: AN-007
-    name: "Iron replete — hold IV iron"
+    name: "Iron overloaded — hold IV iron"
     enabled: true
     urgency: routine
     logic: AND
@@ -117,11 +255,13 @@ rules:
     actions:
       - type: hold
         medication: iv_iron
-        instruction: "TSAT ≥30% and ferritin ≥800: hold IV iron. Recheck in 3 months."
-    rationale: "Iron overload increases oxidative stress and infection risk."
+        instruction: >
+          Iron overloaded — TSAT {tsat}%, ferritin {ferritin} ng/mL.
+          Hold IV iron. Recheck in 3 months.
+    rationale: "Iron overload: TSAT ≥30% and ferritin ≥800 ng/mL."
 
   - id: AN-008
-    name: "Iron adequate — maintenance IV iron"
+    name: "Iron stores adequate — maintenance iron"
     enabled: true
     urgency: monitor
     logic: AND
@@ -134,10 +274,12 @@ rules:
         value: [200, 800]
     actions:
       - type: no_change
-        instruction: "Iron stores adequate (TSAT 20–30%, ferritin 200–800). Continue maintenance iron per protocol."
-    rationale: "Target iron indices per KDIGO 2012 anemia guidelines."
+        instruction: >
+          Iron stores adequate — TSAT {tsat}%, ferritin {ferritin} ng/mL.
+          Continue maintenance IV iron per protocol.
+    rationale: "TSAT 20–30%, ferritin 200–800 ng/mL — within KDIGO targets."
 
-  # ── ESA hypo-response flag ─────────────────────────────────────────────────
+  # ── ESA hypo-response ──────────────────────────────────────────────────────
 
   - id: AN-009
     name: "Possible ESA hypo-response — investigate"
@@ -156,5 +298,9 @@ rules:
         value: 200
     actions:
       - type: investigate
-        instruction: "Hgb below target despite adequate iron stores — evaluate for ESA hypo-response. Check: infection, inflammation (CRP), blood loss, hyperparathyroidism (PTH), aluminum toxicity, B12/folate, hemolysis."
-    rationale: "Adequate iron with persistent anemia suggests a non-iron cause; escalating ESA alone is insufficient."
+        instruction: >
+          Hgb {hemoglobin} g/dL below target despite adequate iron (TSAT {tsat}%,
+          ferritin {ferritin} ng/mL). Evaluate for ESA hypo-response: infection,
+          inflammation (CRP), GI blood loss, PTH {pth} pg/mL, B12/folate, hemolysis,
+          aluminum toxicity.
+    rationale: "Adequate iron with persistent anemia indicates a non-iron cause."

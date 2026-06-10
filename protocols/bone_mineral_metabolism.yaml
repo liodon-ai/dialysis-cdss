@@ -1,23 +1,23 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Bone Mineral Metabolism (BMM) Protocol
-# Update thresholds here; no code changes needed.
 #
-# Supported operators: >  <  >=  <=  ==  !=  between  not_between
-# "between" value must be a list: [low, high]  (inclusive on both ends)
-# logic: AND (default) | OR
-# urgency: urgent | soon | routine | monitor
-# enabled: true (default) | false  — set false to disable a rule temporarily
+# Template tokens in instruction strings:
+#   {pth}  {calcium}  {phosphorus}  {vitamin_d_25oh}
+#   {paricalcitol_mcg}   {calcitriol_mcg}
+#   {cinacalcet_mg}      {etelcalcetide_mg}
+#   {paricalcitol_mcg + 2}  — computed new dose
+#   {cinacalcet_mg + 30}
 # ─────────────────────────────────────────────────────────────────────────────
 
 protocol: bone_mineral_metabolism
-version: "1.0"
+version: "1.1"
 
 rules:
 
-  # ── PTH ────────────────────────────────────────────────────────────────────
+  # ── PTH critically elevated ────────────────────────────────────────────────
 
   - id: BMM-001
-    name: "Severely elevated PTH — escalate therapy"
+    name: "PTH critically elevated (>800) — escalate"
     enabled: true
     urgency: urgent
     logic: AND
@@ -27,46 +27,112 @@ rules:
         value: 800
     actions:
       - type: escalate
-        instruction: "PTH critically elevated (>800). Review active Vitamin D dose and consider adding/increasing calcimimetic. Evaluate for parathyroidectomy referral if refractory."
-    rationale: "PTH >800 pg/mL is above the upper bound of the KDIGO 2-9× ULN target range for dialysis patients."
+        instruction: >
+          PTH {pth} pg/mL — critically elevated. Review active Vitamin D and calcimimetic
+          doses. Consider parathyroidectomy referral if refractory.
+    rationale: "PTH {pth} pg/mL exceeds the KDIGO 2–9× ULN upper bound for dialysis patients."
+
+  # ── PTH elevated (600–800), calcium safe — increase active Vitamin D ───────
 
   - id: BMM-002
-    name: "Elevated PTH — increase active Vitamin D (Ca normal)"
+    name: "PTH elevated — increase paricalcitol (Ca safe)"
     enabled: true
     urgency: routine
     logic: AND
     conditions:
       - field: pth
-        operator: ">"
-        value: 600
+        operator: between
+        value: [600, 800]
       - field: calcium
         operator: "<="
         value: 10.2
+      - field: paricalcitol_mcg
+        operator: is_not_null
     actions:
       - type: increase_dose
         medication: paricalcitol
-        instruction: "Increase paricalcitol by 2 mcg per treatment (or initiate at 2 mcg if not on active Vit D)."
-    rationale: "PTH above target with safe calcium level permits active Vitamin D intensification."
+        instruction: >
+          PTH {pth} pg/mL above target, calcium {calcium} mg/dL safe.
+          Increase paricalcitol {paricalcitol_mcg} mcg → {paricalcitol_mcg + 2} mcg per treatment.
+    rationale: "PTH above target with safe calcium permits active Vitamin D intensification."
+
+  - id: BMM-002b
+    name: "PTH elevated — initiate paricalcitol (none prescribed, Ca safe)"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: pth
+        operator: between
+        value: [600, 800]
+      - field: calcium
+        operator: "<="
+        value: 10.2
+      - field: paricalcitol_mcg
+        operator: is_null
+      - field: calcitriol_mcg
+        operator: is_null
+    actions:
+      - type: initiate
+        medication: paricalcitol
+        instruction: >
+          PTH {pth} pg/mL above target, no active Vitamin D on file.
+          Initiate paricalcitol 2 mcg per treatment (or calcitriol 0.5 mcg per protocol).
+    rationale: "PTH above target with safe calcium and no current active Vitamin D prescribed."
+
+  # ── PTH elevated (600–800) + hypercalcemia — calcimimetic preferred ────────
 
   - id: BMM-003
-    name: "Elevated PTH with hypercalcemia — prefer calcimimetic"
+    name: "PTH elevated + hypercalcemia — increase cinacalcet"
     enabled: true
     urgency: soon
     logic: AND
     conditions:
       - field: pth
-        operator: ">"
-        value: 600
+        operator: between
+        value: [600, 800]
       - field: calcium
         operator: ">"
         value: 10.2
+      - field: cinacalcet_mg
+        operator: is_not_null
     actions:
       - type: adjust
-        instruction: "PTH elevated but calcium high. Hold or decrease active Vitamin D. Increase cinacalcet by 30 mg/day (or initiate if not on calcimimetic)."
-    rationale: "Active Vitamin D would worsen hypercalcemia; calcimimetic lowers both PTH and calcium."
+        instruction: >
+          PTH {pth} pg/mL elevated AND calcium {calcium} mg/dL high.
+          Hold or reduce active Vitamin D. Increase cinacalcet
+          {cinacalcet_mg} mg/day → {cinacalcet_mg + 30} mg/day.
+    rationale: "Active Vitamin D worsens hypercalcemia; calcimimetic lowers both PTH and calcium."
+
+  - id: BMM-003b
+    name: "PTH elevated + hypercalcemia — initiate cinacalcet (none prescribed)"
+    enabled: true
+    urgency: soon
+    logic: AND
+    conditions:
+      - field: pth
+        operator: between
+        value: [600, 800]
+      - field: calcium
+        operator: ">"
+        value: 10.2
+      - field: cinacalcet_mg
+        operator: is_null
+      - field: etelcalcetide_mg
+        operator: is_null
+    actions:
+      - type: initiate
+        medication: cinacalcet
+        instruction: >
+          PTH {pth} pg/mL elevated AND calcium {calcium} mg/dL high, no calcimimetic prescribed.
+          Initiate cinacalcet 30 mg/day (or etelcalcetide per protocol).
+          Hold active Vitamin D until calcium returns to ≤10.2 mg/dL.
+    rationale: "Active Vitamin D worsens hypercalcemia; calcimimetic is preferred in this scenario."
+
+  # ── PTH over-suppressed — reduce active Vitamin D ─────────────────────────
 
   - id: BMM-004
-    name: "Low PTH — over-suppressed, reduce active Vitamin D"
+    name: "PTH over-suppressed — reduce paricalcitol"
     enabled: true
     urgency: routine
     logic: AND
@@ -77,17 +143,43 @@ rules:
       - field: calcium
         operator: ">="
         value: 8.4
+      - field: paricalcitol_mcg
+        operator: is_not_null
     actions:
       - type: decrease_dose
         medication: paricalcitol
-        instruction: "PTH below target. Decrease paricalcitol by 2 mcg per treatment or hold one dose per week."
-      - type: decrease_dose
-        medication: cinacalcet
-        instruction: "If on cinacalcet, consider dose reduction by 30 mg or hold."
+        instruction: >
+          PTH {pth} pg/mL — over-suppressed (<150), calcium {calcium} mg/dL safe.
+          Decrease paricalcitol {paricalcitol_mcg} mcg → {paricalcitol_mcg - 2} mcg per treatment,
+          or hold one dose per week if already at minimum.
     rationale: "Adynamic bone disease risk increases with PTH <150 in chronic dialysis patients."
 
+  - id: BMM-004b
+    name: "PTH over-suppressed — reduce cinacalcet"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: pth
+        operator: "<"
+        value: 150
+      - field: calcium
+        operator: ">="
+        value: 8.4
+      - field: cinacalcet_mg
+        operator: is_not_null
+    actions:
+      - type: decrease_dose
+        medication: cinacalcet
+        instruction: >
+          PTH {pth} pg/mL — over-suppressed (<150), on cinacalcet {cinacalcet_mg} mg/day.
+          Decrease to {cinacalcet_mg - 30} mg/day, or hold if already at 30 mg/day.
+    rationale: "Cinacalcet dose reduction needed to avoid adynamic bone disease."
+
+  # ── PTH over-suppressed + hypocalcemia — hold calcimimetic ────────────────
+
   - id: BMM-005
-    name: "Low PTH with hypocalcemia — hold calcimimetic"
+    name: "PTH over-suppressed + hypocalcemia — hold cinacalcet"
     enabled: true
     urgency: soon
     logic: AND
@@ -98,18 +190,20 @@ rules:
       - field: calcium
         operator: "<"
         value: 8.4
+      - field: cinacalcet_mg
+        operator: is_not_null
     actions:
       - type: hold
         medication: cinacalcet
-        instruction: "Hold cinacalcet — risk of symptomatic hypocalcemia. Correct calcium first."
-      - type: adjust
-        instruction: "Consider calcium-containing dialysate or calcium supplement discussion."
+        instruction: >
+          PTH {pth} pg/mL low AND calcium {calcium} mg/dL low — symptomatic hypocalcemia risk.
+          Hold cinacalcet (currently {cinacalcet_mg} mg/day). Correct calcium before re-challenging.
     rationale: "Calcimimetics further suppress PTH and worsen hypocalcemia."
 
-  # ── Calcium ────────────────────────────────────────────────────────────────
+  # ── Hypercalcemia — hold active Vitamin D ─────────────────────────────────
 
-  - id: BMM-006
-    name: "Hypercalcemia — hold calcium-raising medications"
+  - id: BMM-006a
+    name: "Hypercalcemia — hold paricalcitol"
     enabled: true
     urgency: soon
     logic: AND
@@ -117,17 +211,40 @@ rules:
       - field: calcium
         operator: ">"
         value: 10.2
+      - field: paricalcitol_mcg
+        operator: is_not_null
     actions:
       - type: hold
-        medication: calcitriol_or_paricalcitol
-        instruction: "Hold active Vitamin D analog until calcium returns to <10.2 mg/dL."
+        medication: paricalcitol
+        instruction: >
+          Calcium {calcium} mg/dL — elevated. Hold paricalcitol (currently {paricalcitol_mcg} mcg)
+          until calcium returns to ≤10.2 mg/dL. Switch to non-calcium phosphate binder
+          if phosphorus management is needed.
+    rationale: "Persistent hypercalcemia increases vascular calcification risk."
+
+  - id: BMM-006b
+    name: "Hypercalcemia — hold calcitriol"
+    enabled: true
+    urgency: soon
+    logic: AND
+    conditions:
+      - field: calcium
+        operator: ">"
+        value: 10.2
+      - field: calcitriol_mcg
+        operator: is_not_null
+    actions:
       - type: hold
-        medication: calcium_acetate_mg_tid
-        instruction: "Switch to non-calcium phosphate binder if phosphorus management needed."
-    rationale: "Persistent hypercalcemia increases cardiovascular calcification risk."
+        medication: calcitriol
+        instruction: >
+          Calcium {calcium} mg/dL — elevated. Hold calcitriol (currently {calcitriol_mcg} mcg)
+          until calcium returns to ≤10.2 mg/dL.
+    rationale: "Active Vitamin D further raises calcium — hold until resolved."
+
+  # ── PTH in target range ────────────────────────────────────────────────────
 
   - id: BMM-007
-    name: "PTH in target range — no change"
+    name: "PTH and calcium in target — no change"
     enabled: true
     urgency: monitor
     logic: AND
@@ -140,13 +257,15 @@ rules:
         value: [8.4, 10.2]
     actions:
       - type: no_change
-        instruction: "PTH and calcium both in target range. Continue current regimen."
-    rationale: "KDIGO target PTH 150–600 pg/mL for dialysis patients."
+        instruction: >
+          PTH {pth} pg/mL and calcium {calcium} mg/dL in target range.
+          Continue paricalcitol {paricalcitol_mcg} mcg / cinacalcet {cinacalcet_mg} mg/day.
+    rationale: "KDIGO target PTH 150–600 pg/mL, calcium 8.4–10.2 mg/dL."
 
-  # ── Vitamin D (nutritional) ────────────────────────────────────────────────
+  # ── Nutritional Vitamin D deficiency ──────────────────────────────────────
 
   - id: BMM-008
-    name: "Vitamin D deficiency — supplement"
+    name: "Nutritional Vitamin D deficiency — supplement"
     enabled: true
     urgency: routine
     logic: AND
@@ -157,5 +276,8 @@ rules:
     actions:
       - type: initiate
         medication: cholecalciferol
-        instruction: "Initiate or increase cholecalciferol 2000–4000 IU/day (ergocalciferol 50,000 IU/week x8 weeks if severely deficient)."
-    rationale: "Nutritional Vitamin D deficiency is common in ESKD and worsens secondary hyperparathyroidism."
+        instruction: >
+          Vitamin D 25-OH {vitamin_d_25oh} ng/mL — deficient (<20).
+          Initiate or increase cholecalciferol 2000–4000 IU/day
+          (ergocalciferol 50,000 IU/week × 8 weeks if severely deficient).
+    rationale: "Nutritional Vitamin D deficiency worsens secondary hyperparathyroidism in ESKD."

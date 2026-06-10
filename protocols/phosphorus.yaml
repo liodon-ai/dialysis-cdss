@@ -1,14 +1,22 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Phosphorus Management Protocol
+#
+# Template tokens in instruction strings:
+#   {phosphorus}  {calcium}
+#   {sevelamer_mg_tid}       {lanthanum_mg_tid}
+#   {calcium_acetate_mg_tid}
+#   {sevelamer_mg_tid + 400}  — computed new dose (one tablet increase)
 # ─────────────────────────────────────────────────────────────────────────────
 
 protocol: phosphorus
-version: "1.0"
+version: "1.1"
 
 rules:
 
+  # ── Critically elevated phosphorus (>7.0) ─────────────────────────────────
+
   - id: PHOS-001
-    name: "Severely elevated phosphorus — escalate binders"
+    name: "Phosphorus critically elevated (>7.0) — escalate"
     enabled: true
     urgency: urgent
     logic: AND
@@ -18,11 +26,16 @@ rules:
         value: 7.0
     actions:
       - type: escalate
-        instruction: "Phosphorus critically elevated (>7.0 mg/dL). Review dietary adherence. Increase phosphate binder dose at all meals and snacks. Consider adding a second class of binder. Urgent dietary counseling."
+        instruction: >
+          Phosphorus {phosphorus} mg/dL — critically elevated (>7.0). Review dietary
+          adherence urgently. Increase binders at all meals and snacks.
+          Consider adding a second class of binder. Urgent dietary counseling.
     rationale: "Phosphorus >7 mg/dL is associated with markedly elevated cardiovascular and mortality risk."
 
-  - id: PHOS-002
-    name: "Elevated phosphorus — increase binder dose"
+  # ── Elevated (5.5–7.0) — increase binder dose ─────────────────────────────
+
+  - id: PHOS-002a
+    name: "Elevated phosphorus — increase sevelamer"
     enabled: true
     urgency: routine
     logic: AND
@@ -30,11 +43,62 @@ rules:
       - field: phosphorus
         operator: between
         value: [5.5, 7.0]
+      - field: sevelamer_mg_tid
+        operator: is_not_null
     actions:
       - type: increase_dose
+        medication: sevelamer
+        instruction: >
+          Phosphorus {phosphorus} mg/dL — above target. Increase sevelamer from
+          {sevelamer_mg_tid} mg TID → {sevelamer_mg_tid + 400} mg TID (one tablet per meal).
+          Reinforce dietary phosphorus restriction.
+    rationale: "KDIGO target phosphorus 3.5–5.5 mg/dL."
+
+  - id: PHOS-002b
+    name: "Elevated phosphorus — increase lanthanum"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: phosphorus
+        operator: between
+        value: [5.5, 7.0]
+      - field: lanthanum_mg_tid
+        operator: is_not_null
+    actions:
+      - type: increase_dose
+        medication: lanthanum
+        instruction: >
+          Phosphorus {phosphorus} mg/dL — above target. Increase lanthanum from
+          {lanthanum_mg_tid} mg TID → {lanthanum_mg_tid + 500} mg TID. Reinforce
+          dietary phosphorus restriction.
+    rationale: "KDIGO target phosphorus 3.5–5.5 mg/dL."
+
+  - id: PHOS-002c
+    name: "Elevated phosphorus — initiate binder (none prescribed)"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: phosphorus
+        operator: between
+        value: [5.5, 7.0]
+      - field: sevelamer_mg_tid
+        operator: is_null
+      - field: lanthanum_mg_tid
+        operator: is_null
+      - field: calcium_acetate_mg_tid
+        operator: is_null
+    actions:
+      - type: initiate
         medication: phosphate_binder
-        instruction: "Phosphorus above target (>5.5 mg/dL). Increase sevelamer/lanthanum/calcium acetate dose by one tablet per meal, or add a dose with largest meal. Reinforce dietary phosphorus restriction."
-    rationale: "KDIGO target phosphorus 3.5–5.5 mg/dL for dialysis patients."
+        instruction: >
+          Phosphorus {phosphorus} mg/dL — above target, no binder on file.
+          Initiate sevelamer 800 mg TID with meals (or lanthanum / calcium acetate
+          per formulary). Dietary phosphorus counseling.
+    rationale: "KDIGO target phosphorus 3.5–5.5 mg/dL; no binder currently prescribed."
+
+  # ── In target range ────────────────────────────────────────────────────────
 
   - id: PHOS-003
     name: "Phosphorus in target range — no binder change"
@@ -47,11 +111,15 @@ rules:
         value: [3.5, 5.5]
     actions:
       - type: no_change
-        instruction: "Phosphorus in target range (3.5–5.5 mg/dL). Continue current binder regimen."
+        instruction: >
+          Phosphorus {phosphorus} mg/dL — in target range (3.5–5.5).
+          Continue sevelamer {sevelamer_mg_tid} mg TID / lanthanum {lanthanum_mg_tid} mg TID.
     rationale: "Phosphorus within KDIGO target range."
 
-  - id: PHOS-004
-    name: "Low phosphorus — reduce or hold binders"
+  # ── Low phosphorus — reduce/hold binders ──────────────────────────────────
+
+  - id: PHOS-004a
+    name: "Low phosphorus — reduce sevelamer"
     enabled: true
     urgency: routine
     logic: AND
@@ -59,14 +127,40 @@ rules:
       - field: phosphorus
         operator: "<"
         value: 3.5
+      - field: sevelamer_mg_tid
+        operator: is_not_null
     actions:
       - type: decrease_dose
-        medication: phosphate_binder
-        instruction: "Phosphorus below target (<3.5 mg/dL). Reduce phosphate binder dose. Hold binders with any meal where patient reports poor appetite. Recheck in 2–4 weeks."
+        medication: sevelamer
+        instruction: >
+          Phosphorus {phosphorus} mg/dL — below target (<3.5). Reduce sevelamer from
+          {sevelamer_mg_tid} mg TID → {sevelamer_mg_tid - 400} mg TID,
+          or hold with any meal where appetite is poor.
     rationale: "Hypophosphatemia in dialysis patients can cause muscle weakness and bone pain."
 
+  - id: PHOS-004b
+    name: "Low phosphorus — reduce lanthanum"
+    enabled: true
+    urgency: routine
+    logic: AND
+    conditions:
+      - field: phosphorus
+        operator: "<"
+        value: 3.5
+      - field: lanthanum_mg_tid
+        operator: is_not_null
+    actions:
+      - type: decrease_dose
+        medication: lanthanum
+        instruction: >
+          Phosphorus {phosphorus} mg/dL — below target (<3.5). Reduce lanthanum from
+          {lanthanum_mg_tid} mg TID → {lanthanum_mg_tid - 500} mg TID.
+    rationale: "Hypophosphatemia in dialysis patients can cause muscle weakness and bone pain."
+
+  # ── High phosphorus + hypercalcemia — switch from calcium binder ──────────
+
   - id: PHOS-005
-    name: "High phosphorus with hypercalcemia — avoid calcium binders"
+    name: "Elevated phosphorus + hypercalcemia — switch from calcium acetate"
     enabled: true
     urgency: soon
     logic: AND
@@ -77,7 +171,12 @@ rules:
       - field: calcium
         operator: ">"
         value: 10.2
+      - field: calcium_acetate_mg_tid
+        operator: is_not_null
     actions:
       - type: adjust
-        instruction: "Phosphorus high AND calcium elevated. Switch from calcium acetate to non-calcium binder (sevelamer or lanthanum). Calcium binders contraindicated in hypercalcemia."
+        instruction: >
+          Phosphorus {phosphorus} mg/dL high AND calcium {calcium} mg/dL elevated.
+          Calcium acetate (currently {calcium_acetate_mg_tid} mg TID) is contraindicated
+          in hypercalcemia. Switch to sevelamer 800 mg TID or lanthanum per formulary.
     rationale: "Calcium-based binders worsen hypercalcemia and cardiovascular calcification."
