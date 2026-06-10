@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: dialysis-cdss
+    runtime: python
+    plan: free          # upgrade to "starter" ($7/mo) to add a persistent disk
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+
+    # ── Persistent disk (deviation log + sessions) ────────────────────────
+    # The free plan does NOT support disks — deviation data will reset on
+    # each deploy. To keep data across deploys, either:
+    #   (a) upgrade to the Starter plan and uncomment the disk block below, or
+    #   (b) set DATA_DIR to an external NFS/S3 path you manage yourself.
+    #
+    # disk:
+    #   name: cdss-data
+    #   mountPath: /data
+    #   sizeGB: 1       # $0.25/GB/month on top of service cost
+
+    envVars:
+      - key: DATA_DIR
+        value: /data    # matches mountPath above — harmless on free tier
+                        # (will fall back to ephemeral /data inside the container)

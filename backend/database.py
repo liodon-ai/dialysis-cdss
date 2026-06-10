@@ -3,12 +3,16 @@ SQLite-backed deviation log and patient session store.
 Tables are created on first run — no migration tooling needed for the prototype.
 """
 
+import os
 import sqlite3
 import json
 from pathlib import Path
 from datetime import datetime, timezone
 
-DB_PATH = Path(__file__).parent.parent / "data" / "cdss.db"
+# DATA_DIR env var lets Render (or any host) point this at a persistent disk.
+# Falls back to a local ./data/ directory for development.
+_data_dir = Path(os.environ.get("DATA_DIR", Path(__file__).parent.parent / "data"))
+DB_PATH = _data_dir / "cdss.db"
 
 
 def _conn() -> sqlite3.Connection:
